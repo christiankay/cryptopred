@@ -6,8 +6,10 @@ Created on Sun Jun 17 15:28:18 2018
 """
 
 import data_reader as data_reader
-import Load_Tweets_Class as LTC
-
+import raspi_tweet_fetcher.Load_Tweets_Class as LTC
+from textblob import TextBlob
+import re
+import os
 import pandas as pd
 
 selected_coins = ['BTC', 'ETH']   #['BTC', 'LTC', 'ETH', 'XMR']
@@ -22,7 +24,9 @@ coin_list = df_ini.fetch_coin_data(selected_coins, period)
 
 
        ### init 
-get_tweet_data = LTC()
+  
+
+get_tweet_data = LTC.get_tweets()
 ### fetch data based on query word
 #get_tweet_data.fetch_tweets(query='BITCOIN', count=100, pages=1)
 

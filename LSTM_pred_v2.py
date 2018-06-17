@@ -17,6 +17,7 @@ from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 from keras.models import load_model
 import os
 import tensorflow as tf
+import re
 
 
 def create_coin_dataset(coin_list, starttime = '2018-06-05', split_date = '2018-06-05' , features = ['_close','_volume','_close_off_high','_volatility', '_date']):
@@ -95,7 +96,21 @@ split_date = '2018-06-15'
 df_ini = data_reader.get_poloniex_data()
 coin_list = df_ini.fetch_coin_data(selected_coins, period)   
 
+import raspi_tweet_fetcher.Load_Tweets_Class as LTC    
+      
+       ### init 
+get_tweet_data = LTC.get_tweets()
+### fetch data based on query word
+#get_tweet_data.fetch_tweets(query='BITCOIN', count=100, pages=1)
 
+
+#get_tweet_data.fetch_stocktwits(query='BITCOIN')
+### delete duplicates data from CSV
+data = get_tweet_data.read_and_clean_data_from_csv(query='BITCOIN')
+#data = get_tweet_data.data
+        
+
+results = get_tweet_data.analyze_Tweets(data)
     
 training_set, test_set, model_data  = create_coin_dataset(coin_list, starttime = '2018-06-05',
                                               split_date = split_date , 
