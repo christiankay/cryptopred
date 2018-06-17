@@ -1,0 +1,3 @@
+[submodule "raspi_tweet_fetcher"]
+	path = raspi_tweet_fetcher
+	url = https://github.com/christiankay/raspi_tweet_fetcher.git
