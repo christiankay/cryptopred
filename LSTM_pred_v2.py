@@ -39,9 +39,9 @@ def create_coin_dataset(coin_list, starttime = '2018-06-05', split_date = '2018-
         coin+'_volatility': lambda x: (x[coin+'_high']- x[coin+'_low'])/(x[coin+'_open'])}
         coin_market_info = coin_market_info.assign(**kwargs)
      
-        kwargs = { coin+'_date': lambda x: (x[coin+'_date']- x[coin+'_date'][0])}
-        coin_market_info = coin_market_info.assign(**kwargs)
-        
+#        kwargs = { coin+'_date': lambda x: (x[coin+'_date']- x[coin+'_date'][0])}
+#        coin_market_info = coin_market_info.assign(**kwargs)
+#        
 
             
         coin_market_info.rename(columns={coin+'_date_format': 'date_format'}, inplace=True)
@@ -50,6 +50,8 @@ def create_coin_dataset(coin_list, starttime = '2018-06-05', split_date = '2018-
             market_info_prev = market_info
         else:
             market_info_prev = coin_market_info
+            market_info = coin_market_info
+            
             
             
    
@@ -106,17 +108,35 @@ get_tweet_data = LTC.get_tweets()
 
 #get_tweet_data.fetch_stocktwits(query='BITCOIN')
 ### delete duplicates data from CSV
-data = get_tweet_data.read_and_clean_data_from_csv(query='BITCOIN')
+tweet_data = get_tweet_data.read_and_clean_data_from_csv(query='BITCOIN')
 #data = get_tweet_data.data
         
+fin_data = coin_list['BTC']
 
-results = get_tweet_data.analyze_Tweets(data)
-    
-training_set, test_set, model_data  = create_coin_dataset(coin_list, starttime = '2018-06-05',
+try:
+    tweet_results = pd.read_csv('temp_results.csv')
+    print('Loaded temp_results.csv !')
+except FileNotFoundError:
+    tweet_results = get_tweet_data.analyze_Tweets(tweet_data)
+
+fin_data['Date'] = pd.to_datetime(fin_data.date_format)
+tweet_results['Date'] = pd.to_datetime(tweet_results['days'])
+
+merged = pd.merge(fin_data, tweet_results, how='outer', on='Date')
+merged.dropna(how = 'any' , inplace = True)
+print("Preparing data for deep learning....")
+ 
+new_coin_list = {}
+new_coin_list['BTC'] =   merged    
+
+training_set, test_set, model_data  = create_coin_dataset(new_coin_list, starttime = '2017-06-05',
                                               split_date = split_date , 
-                                              features = ['_close','_volume','_volatility','_date'])# '_date','_close_off_high'])        
+                                              features = ['_close','_volume','_volatility','_date', '_weightedAverage' , 
+                                                          '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet'])# '_date','_close_off_high'])    
+
+
         
-window_len = 15
+window_len = 5
 norm_cols = [coin+metric for coin in selected_coins for metric in ['_close','_volume','_close_off_high','_volatility', '_date']]
 
 
@@ -230,7 +250,7 @@ for i in range(LSTM_training_inputs.shape[2]):
 # model output is next price normalised to 10th previous closing price
 from sklearn.preprocessing import OneHotEncoder
 enc = OneHotEncoder()    
-test_set_close = test_set['ETH_close'].values  
+test_set_close = test_set['BTC_close'].values  
 pred = [] 
 quo = []
 for i in range(len(test_set_close)-window_len):
@@ -251,7 +271,7 @@ LSTM_test_outputs = pred
 LSTM_test_outputs = np.asarray(LSTM_test_outputs)
 LSTM_test_outputs_onehot = enc.fit_transform(LSTM_test_outputs.reshape(-1,1)).toarray()
 
-training_set_close = training_set['ETH_close'].values  
+training_set_close = training_set['BTC_close'].values  
 pred = [] 
 quo = []
 for i in range(len(training_set_close)-window_len):
@@ -275,14 +295,14 @@ LSTM_training_outputs_onehot = enc.fit_transform(LSTM_training_outputs.reshape(-
 class1 = num_ones = (LSTM_training_outputs_onehot[:,0] == 1).sum()
 print("data in class1: ", class1)
 class2 = num_ones = (LSTM_training_outputs_onehot[:,1] == 1).sum()
-print("data in class1: ", class2)
+print("data in class2: ", class2)
 class3 = num_ones = (LSTM_training_outputs_onehot[:,2] == 1).sum()
-print("data in class1: ", class3)
+print("data in class3: ", class3)
 
 datPath = 'models/'
-path = os.path.join(datPath, 'ETH_' + str(period) + '_' + str(window_len) + '.h5')
+path = os.path.join(datPath, 'BTC_' + str(period) + '_' + str(window_len) + '.h5')
 
-pred_coin = 'ETH_'
+pred_coin = 'BTC_'
 try:
 
     model = load_model(path)
@@ -299,7 +319,7 @@ except:
     from keras.layers import Dropout
     
     def build_model(inputs, output_size, neurons, activ_func="softmax",
-                    dropout=0.5, loss='mae', optimizer="adam"):
+                    dropout=0.1, loss='mae', optimizer="adam"):
         model = Sequential()
     
         model.add(LSTM(output_dim=output_size, activation='softmax',input_shape=(inputs.shape[1], inputs.shape[2]),return_sequences=False))
@@ -313,11 +333,11 @@ except:
         # random seed for reproducibility
     np.random.seed(252)
     # initialise model architecture
-    eth_model = build_model(LSTM_training_inputs, output_size=3, neurons = 200)
+    eth_model = build_model(LSTM_training_inputs, output_size=3, neurons = 40)
     # train model on data
     # note: eth_history contains information on the training error per epoch
     eth_history = eth_model.fit(LSTM_training_inputs, LSTM_training_outputs_onehot, 
-                                epochs=2, batch_size=1, verbose=1, shuffle=True,  validation_data=(LSTM_test_inputs, LSTM_test_outputs_onehot))
+                                epochs=20, batch_size=1, verbose=1, shuffle=True,  validation_data=(LSTM_test_inputs, LSTM_test_outputs_onehot))
 
 
     if not os.path.exists(datPath):
