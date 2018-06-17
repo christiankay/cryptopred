@@ -19,7 +19,7 @@ import os
 import tensorflow as tf
 
 
-def create_coin_dataset(coin_list, starttime = '2017-01-01', split_date = '2017-06-01' , features = ['_close','_volume','_close_off_high','_volatility', '_date']):
+def create_coin_dataset(coin_list, starttime = '2018-06-05', split_date = '2018-06-05' , features = ['_close','_volume','_close_off_high','_volatility', '_date']):
     
     market_info_prev = False
     for coin in coin_list:
@@ -90,11 +90,14 @@ def create_coin_dataset(coin_list, starttime = '2017-01-01', split_date = '2017-
 selected_coins = ['BTC', 'ETH']   #['BTC', 'LTC', 'ETH', 'XMR']
 period = 7200#86400
 
-split_date = '2018-04-10' 
+split_date = '2018-06-15' 
         
 df_ini = data_reader.get_poloniex_data()
-coin_list = df_ini.fetch_coin_data(selected_coins, period)       
-training_set, test_set, model_data  = create_coin_dataset(coin_list, starttime = '2017-01-01',
+coin_list = df_ini.fetch_coin_data(selected_coins, period)   
+
+
+    
+training_set, test_set, model_data  = create_coin_dataset(coin_list, starttime = '2018-06-05',
                                               split_date = split_date , 
                                               features = ['_close','_volume','_volatility','_date'])# '_date','_close_off_high'])        
         
