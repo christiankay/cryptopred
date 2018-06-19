@@ -91,7 +91,7 @@ def create_coin_dataset(coin_list, starttime = '2018-06-05', split_date = '2018-
 
 
 selected_coins = ['BTC', 'ETH']   #['BTC', 'LTC', 'ETH', 'XMR']
-period = 7200#86400
+period = 900#86400 candlestick period in seconds; valid values are 300, 900, 1800, 7200, 14400, and 86400),
 
 split_date = '2018-06-15' 
         
@@ -115,7 +115,7 @@ fin_data = coin_list['BTC']
 
 try:
     tweet_results = pd.read_csv('temp_results.csv')
-    print('Loaded temp_results.csv !')
+    print('/CurDat/Loaded temp_results.csv !')
 except FileNotFoundError:
     tweet_results = get_tweet_data.analyze_Tweets(tweet_data)
 
@@ -131,12 +131,13 @@ new_coin_list['BTC'] =   merged
 
 training_set, test_set, model_data  = create_coin_dataset(new_coin_list, starttime = '2017-06-05',
                                               split_date = split_date , 
-                                              features = ['_close','_volume','_volatility','_date', '_weightedAverage' , 
+                                              features = ['_volatility', '_date','_close',
                                                           '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet'])# '_date','_close_off_high'])    
-
-
+#
+#                                              features = ['_close','_volume','_volatility','_date', '_weightedAverage' , 
+#                                                          '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet'])
         
-window_len = 5
+window_len = 25
 norm_cols = [coin+metric for coin in selected_coins for metric in ['_close','_volume','_close_off_high','_volatility', '_date']]
 
 
@@ -252,52 +253,69 @@ from sklearn.preprocessing import OneHotEncoder
 enc = OneHotEncoder()    
 test_set_close = test_set['BTC_close'].values  
 pred = [] 
-quo = []
+
+accumulate = 5
 for i in range(len(test_set_close)-window_len):
-      
-    current= test_set_close[i]
-    nxt = test_set_close[i+1]
-    diff = nxt - current
-    quo.append(diff/current)
-    
-    if diff/current > 0.01:
+    quo = []
+    count = 0
+    # accumulate next x values for prediction
+    while count < accumulate:
+        current= test_set_close[i+count]
+        nxt = test_set_close[i+1+count]
+        diff = nxt - current
+        quo.append(diff/current)
+        count = count + 1
+        ## add label depanding on 
+    if sum(quo)> 0.001:
         pred.append(2)
-    elif diff/current  < -0.01:
+    elif sum(quo)  < -0.001:
         pred.append(1) 
     else:
         pred.append(0)
-        
+    
 LSTM_test_outputs = pred
 LSTM_test_outputs = np.asarray(LSTM_test_outputs)
 LSTM_test_outputs_onehot = enc.fit_transform(LSTM_test_outputs.reshape(-1,1)).toarray()
+
+class1  = (LSTM_test_outputs_onehot[:,0] == 1).sum()
+print("test data in class1: ", class1)
+class2  = (LSTM_test_outputs_onehot[:,1] == 1).sum()
+print("test data in class2: ", class2)
+class3  = (LSTM_test_outputs_onehot[:,2] == 1).sum()
+print("test data in class3: ", class3)
 
 training_set_close = training_set['BTC_close'].values  
 pred = [] 
 quo = []
 for i in range(len(training_set_close)-window_len):
-      
-    current= training_set_close[i]
-    nxt = training_set_close[i+1]
-    diff = nxt - current
-    quo.append(diff/current)
-    
-    if diff/current > 0.01:
+    quo = []
+    count = 0
+    # accumulate next x values for prediction
+    while count < accumulate:
+        current= training_set_close[i+count]
+        nxt = training_set_close[i+1+count]
+        diff = nxt - current
+        quo.append(diff/current)
+        count = count + 1
+        ## add label depanding on profitability
+    if sum(quo)> 0.001:
         pred.append(2)
-    elif diff/current  < -0.01:
+    elif sum(quo)  < -0.001:
         pred.append(1) 
     else:
         pred.append(0)
+    
         
 LSTM_training_outputs = pred
 LSTM_training_outputs = np.asarray(LSTM_training_outputs)
 LSTM_training_outputs_onehot = enc.fit_transform(LSTM_training_outputs.reshape(-1,1)).toarray()
 
-class1 = num_ones = (LSTM_training_outputs_onehot[:,0] == 1).sum()
-print("data in class1: ", class1)
-class2 = num_ones = (LSTM_training_outputs_onehot[:,1] == 1).sum()
-print("data in class2: ", class2)
-class3 = num_ones = (LSTM_training_outputs_onehot[:,2] == 1).sum()
-print("data in class3: ", class3)
+class1  = (LSTM_training_outputs_onehot[:,0] == 1).sum()
+print("training data in class1: ", class1)
+class2  = (LSTM_training_outputs_onehot[:,1] == 1).sum()
+print("training data in class2: ", class2)
+class3  = (LSTM_training_outputs_onehot[:,2] == 1).sum()
+print("training data in class3: ", class3)
 
 datPath = 'models/'
 path = os.path.join(datPath, 'BTC_' + str(period) + '_' + str(window_len) + '.h5')
@@ -317,29 +335,37 @@ except:
     from keras.layers import Activation, Dense
     from keras.layers import LSTM
     from keras.layers import Dropout
+    from sklearn.metrics import classification_report
     
     def build_model(inputs, output_size, neurons, activ_func="softmax",
-                    dropout=0.1, loss='mae', optimizer="adam"):
+                    dropout=0.25, loss='categorical_crossentropy', optimizer="adam"):
         model = Sequential()
     
-        model.add(LSTM(output_dim=output_size, activation='softmax',input_shape=(inputs.shape[1], inputs.shape[2]),return_sequences=False))
+        model.add(LSTM(output_dim=neurons, activation=activ_func, input_shape=(inputs.shape[1], inputs.shape[2]),return_sequences=False))
         
         model.add(Dropout(dropout))
-        model.add(Dense(units=output_size))
-        model.add(Activation(activ_func))
+        model.add(Dense(units=output_size, activation=activ_func))
+
     
         model.compile(loss=loss, optimizer=optimizer,metrics=['accuracy']) #metrics=['accuracy']
+
         return model
         # random seed for reproducibility
-    np.random.seed(252)
+    np.random.seed(7)
     # initialise model architecture
-    eth_model = build_model(LSTM_training_inputs, output_size=3, neurons = 40)
+    eth_model = build_model(LSTM_training_inputs, output_size=3, neurons = 20)
     # train model on data
     # note: eth_history contains information on the training error per epoch
     eth_history = eth_model.fit(LSTM_training_inputs, LSTM_training_outputs_onehot, 
                                 epochs=20, batch_size=1, verbose=1, shuffle=True,  validation_data=(LSTM_test_inputs, LSTM_test_outputs_onehot))
 
-
+    
+    
+    y_pred = eth_model.predict(LSTM_test_inputs)
+    
+    target_names = ['class 0', 'class 1', 'class 2']
+    print(classification_report(LSTM_test_outputs, y_pred, target_names=target_names))
+    
     if not os.path.exists(datPath):
         os.mkdir(datPath)
     eth_model.save(path)

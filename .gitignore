@@ -8,3 +8,5 @@ CurDat/
 models/
 
 TweetDat/
+
+temp_results\.csv
