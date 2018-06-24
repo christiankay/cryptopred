@@ -18,6 +18,7 @@ from keras.models import load_model
 import os
 import tensorflow as tf
 import re
+from sklearn.preprocessing import OneHotEncoder
 
 
 def create_coin_dataset(coin_list, starttime = '2018-06-05', split_date = '2018-06-05' , features = ['_close','_volume','_close_off_high','_volatility', '_date']):
@@ -88,339 +89,398 @@ def create_coin_dataset(coin_list, starttime = '2018-06-05', split_date = '2018-
     return training_set, test_set, model_data     
 
 
-
-
-selected_coins = ['BTC', 'ETH']   #['BTC', 'LTC', 'ETH', 'XMR']
-period = 900#86400 candlestick period in seconds; valid values are 300, 900, 1800, 7200, 14400, and 86400),
-
-split_date = '2018-06-15' 
-        
-df_ini = data_reader.get_poloniex_data()
-coin_list = df_ini.fetch_coin_data(selected_coins, period)   
-
-import raspi_tweet_fetcher.Load_Tweets_Class as LTC    
-      
-       ### init 
-get_tweet_data = LTC.get_tweets()
-### fetch data based on query word
-#get_tweet_data.fetch_tweets(query='BITCOIN', count=100, pages=1)
-
-
-#get_tweet_data.fetch_stocktwits(query='BITCOIN')
-### delete duplicates data from CSV
-tweet_data = get_tweet_data.read_and_clean_data_from_csv(query='BITCOIN')
-#data = get_tweet_data.data
-        
-fin_data = coin_list['BTC']
-
-try:
-    tweet_results = pd.read_csv('temp_results.csv')
-    print('/CurDat/Loaded temp_results.csv !')
-except FileNotFoundError:
-    tweet_results = get_tweet_data.analyze_Tweets(tweet_data)
-
-fin_data['Date'] = pd.to_datetime(fin_data.date_format)
-tweet_results['Date'] = pd.to_datetime(tweet_results['days'])
-
-merged = pd.merge(fin_data, tweet_results, how='outer', on='Date')
-merged.dropna(how = 'any' , inplace = True)
-print("Preparing data for deep learning....")
- 
-new_coin_list = {}
-new_coin_list['BTC'] =   merged    
-
-training_set, test_set, model_data  = create_coin_dataset(new_coin_list, starttime = '2017-06-05',
-                                              split_date = split_date , 
-                                              features = ['_volatility', '_date','_close',
-                                                          '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet'])# '_date','_close_off_high'])    
-#
-#                                              features = ['_close','_volume','_volatility','_date', '_weightedAverage' , 
-#                                                          '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet'])
-        
-window_len = 25
-norm_cols = [coin+metric for coin in selected_coins for metric in ['_close','_volume','_close_off_high','_volatility', '_date']]
-
-
-## getting the Bitcoin and Eth logos
-#import sys
-#from PIL import Image
-#import io
-#
-#if sys.version_info[0] < 3:
-#    import urllib2 as urllib
-#    bt_img = urllib.urlopen("http://logok.org/wp-content/uploads/2016/10/Bitcoin-Logo-640x480.png")
-#    eth_img = urllib.urlopen("https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Ethereum_logo_2014.svg/256px-Ethereum_logo_2014.svg.png")
-#else:
-#    import urllib
-#    bt_img = urllib.request.urlopen("http://logok.org/wp-content/uploads/2016/10/Bitcoin-Logo-640x480.png")
-#    eth_img = urllib.request.urlopen("https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Ethereum_logo_2014.svg/256px-Ethereum_logo_2014.svg.png")
-#
-#image_file = io.BytesIO(bt_img.read())
-#bitcoin_im = Image.open(image_file)
-#
-#image_file = io.BytesIO(eth_img.read())
-#eth_im = Image.open(image_file)
-#width_eth_im , height_eth_im  = eth_im.size
-#eth_im = eth_im.resize((int(eth_im.size[0]*0.8), int(eth_im.size[1]*0.8)), Image.ANTIALIAS)
-#
-#
-
-#
-#fig, (ax1, ax2) = plt.subplots(2,1, gridspec_kw = {'height_ratios':[3, 1]})
-#ax1.set_ylabel('Closing Price ($)',fontsize=12)
-#ax2.set_ylabel('Volume ($ bn)',fontsize=12)
-#ax2.set_yticks([int('%d000000000'%i) for i in range(10)])
-#ax2.set_yticklabels(range(10))
-#ax1.set_xticks([datetime.date(i,j,1) for i in range(2013,2019) for j in [1,7]])
-#ax1.set_xticklabels('')
-#ax2.set_xticks([datetime.date(i,j,1) for i in range(2013,2019) for j in [1,7]])
-#ax2.set_xticklabels([datetime.date(i,j,1).strftime('%b %Y')  for i in range(2013,2019) for j in [1,7]])
-#ax1.plot(bitcoin_market_info['bt_date'].astype(datetime.datetime),bitcoin_market_info['bt_open'])
-#ax2.bar(bitcoin_market_info['bt_date'].astype(datetime.datetime).values, bitcoin_market_info['bt_volume'].values)
-#fig.tight_layout()
-#fig.figimage(bitcoin_im, 100, 120, zorder=3,alpha=.5)
-#plt.show()
-#
-#
-#
-#fig, (ax1, ax2) = plt.subplots(2,1, gridspec_kw = {'height_ratios':[3, 1]})
-##ax1.set_yscale('log')
-#ax1.set_ylabel('Closing Price ($)',fontsize=12)
-#ax2.set_ylabel('Volume ($ bn)',fontsize=12)
-#ax2.set_yticks([int('%d000000000'%i) for i in range(10)])
-#ax2.set_yticklabels(range(10))
-#ax1.set_xticks([datetime.date(i,j,1) for i in range(2013,2019) for j in [1,7]])
-#ax1.set_xticklabels('')
-#ax2.set_xticks([datetime.date(i,j,1) for i in range(2013,2019) for j in [1,7]])
-#ax2.set_xticklabels([datetime.date(i,j,1).strftime('%b %Y')  for i in range(2013,2019) for j in [1,7]])
-#ax1.plot(eth_market_info['eth_date'].astype(datetime.datetime),eth_market_info['eth_open'])
-#ax2.bar(eth_market_info['eth_date'].astype(datetime.datetime).values, eth_market_info['eth_volume'].values)
-#fig.tight_layout()
-#fig.figimage(eth_im, 300, 180, zorder=3, alpha=.6)
-#plt.show()
-#
-#
-
-
-
-
-
-
-LSTM_training_inputs = []
-for i in range(len(training_set)-window_len):
-    temp_set = training_set[i:(i+window_len)].copy()
-#    for col in norm_cols:
-#        temp_set = MaxAbsScaler().fit_transform(temp_set)
-#        temp_set.loc[:, col] = temp_set[col]/temp_set[col].iloc[0] - 1 ## sclaling
-    LSTM_training_inputs.append(temp_set)
-
-
-
-
-LSTM_test_inputs = []
-for i in range(len(test_set)-window_len):
-    temp_set = test_set[i:(i+window_len)].copy()
-#    for col in norm_cols:
-        
-#        temp_set.loc[:, col] = temp_set[col]/temp_set[col].iloc[0] - 1 ##scaling
+def merge_lstm_data(split_date = '2018-06-20', period = 900, features = ['_volatility', '_date','_close',
+                                                              '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet']):
+    ####### important parameters##################
+    selected_coins = ['BTC', 'ETH']   #['BTC', 'LTC', 'ETH', 'XMR']
+   # period = 900#86400 candlestick period in seconds; valid values are 300, 900, 1800, 7200, 14400, and 86400),
+   # split_date = '2018-06-20' 
+   # window_len = 25
+    #######################################        
+    df_ini = data_reader.get_poloniex_data()
+    coin_list = df_ini.fetch_coin_data(selected_coins, period)   
     
-    LSTM_test_inputs.append(temp_set)
+    import raspi_tweet_fetcher.Load_Tweets_Class as LTC    
+          
+           ### init 
+    get_tweet_data = LTC.get_tweets()
+    ### fetch data based on query word
+    #get_tweet_data.fetch_tweets(query='BITCOIN', count=100, pages=1)
     
     
+    #get_tweet_data.fetch_stocktwits(query='BITCOIN')
+    ### delete duplicates data from CSV
+    tweet_data = get_tweet_data.read_and_clean_data_from_csv(query='BITCOIN')
+    #data = get_tweet_data.data
+            
+    fin_data = coin_list['BTC']
+    
+    try:
+        tweet_results = pd.read_csv('CurDat/temp_results.csv')
+        print('/n')
+        print('Loaded data from CurDat/temp_results.csv !')
+        print('/n')
+    except FileNotFoundError:
+        tweet_results = get_tweet_data.analyze_Tweets(tweet_data)
+    
+    fin_data['Date'] = pd.to_datetime(fin_data.date_format)
+    tweet_results['Date'] = pd.to_datetime(tweet_results['days'])
+    
+    merged = pd.merge(fin_data, tweet_results, how='outer', on='Date')
+    merged.dropna(how = 'any' , inplace = True)
+    
+     
+    new_coin_list = {}
+    new_coin_list['BTC'] =   merged    
+    
+    training_set, test_set, model_data  = create_coin_dataset(new_coin_list, starttime = '2017-06-05',
+                                                  split_date = split_date , 
+                                                  features = ['_volatility', '_date','_close',
+                                                              '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet'])# '_date','_close_off_high'])    
+    #
+    #                                              features = ['_close','_volume','_volatility','_date', '_weightedAverage' , 
+    #                                                          '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet'])
+            
+    return training_set, test_set, model_data
+     
 
 
-
-#print("example of input data", LSTM_training_inputs[0])
-
-# I find it easier to work with numpy arrays rather than pandas dataframes
-# especially as we now only have numerical data
-LSTM_training_inputs = [np.array(LSTM_training_input) for LSTM_training_input in LSTM_training_inputs]
-LSTM_training_inputs = np.array(LSTM_training_inputs)
-
-LSTM_test_inputs = [np.array(LSTM_test_inputs) for LSTM_test_inputs in LSTM_test_inputs]
-LSTM_test_inputs = np.array(LSTM_test_inputs)
-
-## scaling
-for i in range(LSTM_training_inputs.shape[2]):
-    MaxAbsScaler().fit_transform(LSTM_training_inputs[:,:,i])
+def prep_lstm_input(training_set, test_set, window_len):
+    
+    #### create windowed data  
+    
+    LSTM_training_inputs = []
+    for i in range(len(training_set)-window_len):
+        temp_set = training_set[i:(i+window_len)].copy()
+    #    for col in norm_cols:
+    #        temp_set = MaxAbsScaler().fit_transform(temp_set)
+    #        temp_set.loc[:, col] = temp_set[col]/temp_set[col].iloc[0] - 1 ## sclaling
+        LSTM_training_inputs.append(temp_set)
+    
+    
+    
+    
+    LSTM_test_inputs = []
+    for i in range(len(test_set)-window_len):
+        temp_set = test_set[i:(i+window_len)].copy()
+    #    for col in norm_cols:
+            
+    #        temp_set.loc[:, col] = temp_set[col]/temp_set[col].iloc[0] - 1 ##scaling
+        
+        LSTM_test_inputs.append(temp_set)
+        
+        
+    
+    
+    
+    #print("example of input data", LSTM_training_inputs[0])
+    
+    # I find it easier to work with numpy arrays rather than pandas dataframes
+    # especially as we now only have numerical data
+    LSTM_training_inputs = [np.array(LSTM_training_input) for LSTM_training_input in LSTM_training_inputs]
+    LSTM_training_inputs = np.array(LSTM_training_inputs)
+    
+    LSTM_test_inputs = [np.array(LSTM_test_inputs) for LSTM_test_inputs in LSTM_test_inputs]
+    LSTM_test_inputs = np.array(LSTM_test_inputs)
+    
+##    ## scaling
+    LSTM_training_inputs_scaled = np.zeros_like(LSTM_training_inputs)
+    for i in range(LSTM_training_inputs.shape[2]):
+        print(i)
+        LSTM_training_inputs_scaled[:,:,i] = MaxAbsScaler().fit_transform(LSTM_training_inputs[:,:,i])
+##        
+    LSTM_test_inputs_scaled = np.zeros_like(LSTM_test_inputs)     
+    for i in range(LSTM_test_inputs.shape[2]):
+        LSTM_test_inputs_scaled[:,:,i]= MaxAbsScaler().fit_transform(LSTM_test_inputs[:,:,i])    
 #LSTM_training_inputs = MaxAbsScaler().transform(LSTM_training_inputs)
 #LSTM_test_inputs = MaxAbsScaler().transform(LSTM_training_inputs)
 
+    return LSTM_training_inputs_scaled, LSTM_test_inputs_scaled
 
 
-# model output is next price normalised to 10th previous closing price
-from sklearn.preprocessing import OneHotEncoder
-enc = OneHotEncoder()    
-test_set_close = test_set['BTC_close'].values  
-pred = [] 
 
-accumulate = 5
-for i in range(len(test_set_close)-window_len):
-    quo = []
-    count = 0
-    # accumulate next x values for prediction
-    while count < accumulate:
-        current= test_set_close[i+count]
-        nxt = test_set_close[i+1+count]
-        diff = nxt - current
-        quo.append(diff/current)
-        count = count + 1
-        ## add label depanding on 
-    if sum(quo)> 0.001:
-        pred.append(2)
-    elif sum(quo)  < -0.001:
-        pred.append(1) 
-    else:
-        pred.append(0)
+def prep_lstm_output_classification(training_data_set, test_data_set, window_len, accumulate):
+
+    # model output is next price normalised to 10th previous closing price
     
-LSTM_test_outputs = pred
-LSTM_test_outputs = np.asarray(LSTM_test_outputs)
-LSTM_test_outputs_onehot = enc.fit_transform(LSTM_test_outputs.reshape(-1,1)).toarray()
-
-class1  = (LSTM_test_outputs_onehot[:,0] == 1).sum()
-print("test data in class1: ", class1)
-class2  = (LSTM_test_outputs_onehot[:,1] == 1).sum()
-print("test data in class2: ", class2)
-class3  = (LSTM_test_outputs_onehot[:,2] == 1).sum()
-print("test data in class3: ", class3)
-
-training_set_close = training_set['BTC_close'].values  
-pred = [] 
-quo = []
-for i in range(len(training_set_close)-window_len):
-    quo = []
-    count = 0
-    # accumulate next x values for prediction
-    while count < accumulate:
-        current= training_set_close[i+count]
-        nxt = training_set_close[i+1+count]
-        diff = nxt - current
-        quo.append(diff/current)
-        count = count + 1
-        ## add label depanding on profitability
-    if sum(quo)> 0.001:
-        pred.append(2)
-    elif sum(quo)  < -0.001:
-        pred.append(1) 
-    else:
-        pred.append(0)
+    enc = OneHotEncoder()    
+    test_set_close = test_data_set['BTC_close'].values  
+    pred = [] 
     
+    
+    for i in range(len(test_set_close)-window_len):
+        quo = []
+        count = 0
+        # accumulate next x values for prediction
+        while count < accumulate:
+            current= test_set_close[i+count]
+            nxt = test_set_close[i+1+count]
+            diff = nxt - current
+            quo.append(diff/current)
+            count = count + 1
+            ## add label depanding on 
+        if sum(quo)> 0.001:
+            pred.append(2)
+        elif sum(quo)  < -0.001:
+            pred.append(1) 
+        else:
+            pred.append(0)
         
-LSTM_training_outputs = pred
-LSTM_training_outputs = np.asarray(LSTM_training_outputs)
-LSTM_training_outputs_onehot = enc.fit_transform(LSTM_training_outputs.reshape(-1,1)).toarray()
+    LSTM_test_outputs = pred
+    LSTM_test_outputs = np.asarray(LSTM_test_outputs)
+    LSTM_test_outputs_onehot = enc.fit_transform(LSTM_test_outputs.reshape(-1,1)).toarray()
+    
+    class1  = (LSTM_test_outputs_onehot[:,0] == 1).sum()
+    print("test data in class1: ", class1)
+    class2  = (LSTM_test_outputs_onehot[:,1] == 1).sum()
+    print("test data in class2: ", class2)
+    class3  = (LSTM_test_outputs_onehot[:,2] == 1).sum()
+    print("test data in class3: ", class3)
+    
+    training_set_close = training_data_set['BTC_close'].values  
+    pred = [] 
+    quo = []
+    for i in range(len(training_set_close)-window_len):
+        quo = []
+        count = 0
+        # accumulate next x values for prediction
+        while count < accumulate:
+            current= training_set_close[i+count]
+            nxt = training_set_close[i+1+count]
+            diff = nxt - current
+            quo.append(diff/current)
+            count = count + 1
+            ## add label depanding on profitability
+        if sum(quo)> 0.001:
+            pred.append(2)
+        elif sum(quo)  < -0.001:
+            pred.append(1) 
+        else:
+            pred.append(0)
+        
+            
+    LSTM_training_outputs = pred
+    LSTM_training_outputs = np.asarray(LSTM_training_outputs)
+    LSTM_training_outputs_onehot = enc.fit_transform(LSTM_training_outputs.reshape(-1,1)).toarray()
+    
+    class1  = (LSTM_training_outputs_onehot[:,0] == 1).sum()
+    print("training data in class1: ", class1)
+    class2  = (LSTM_training_outputs_onehot[:,1] == 1).sum()
+    print("training data in class2: ", class2)
+    class3  = (LSTM_training_outputs_onehot[:,2] == 1).sum()
+    print("training data in class3: ", class3)
+    
+    return LSTM_training_outputs_onehot, LSTM_test_outputs_onehot
 
-class1  = (LSTM_training_outputs_onehot[:,0] == 1).sum()
-print("training data in class1: ", class1)
-class2  = (LSTM_training_outputs_onehot[:,1] == 1).sum()
-print("training data in class2: ", class2)
-class3  = (LSTM_training_outputs_onehot[:,2] == 1).sum()
-print("training data in class3: ", class3)
+def prep_lstm_output_reg(training_data_set, test_data_set):
 
-datPath = 'models/'
-path = os.path.join(datPath, 'BTC_' + str(period) + '_' + str(window_len) + '.h5')
+    # model output is next price normalised to 10th previous closing price
+    
+    enc = OneHotEncoder()    
+    test_set_close = test_data_set['BTC_close'].values  
+    pred = [] 
+    
+    
+    for i in range(len(test_set_close)-window_len):
+           
+            pred.append(test_set_close[i+1])
+        
+    LSTM_test_outputs = pred
+    LSTM_test_outputs = np.asarray(LSTM_test_outputs)
 
-pred_coin = 'BTC_'
-try:
+    
 
-    model = load_model(path)
-    eth_model = model
+    
+    training_set_close = training_data_set['BTC_close'].values  
+    pred = [] 
+  
+    for i in range(len(training_set_close)-window_len):
+            
+            pred.append(training_set_close[i+1])
+       
+            
+    LSTM_training_outputs = pred
+    LSTM_training_outputs = np.asarray(LSTM_training_outputs)
 
-    print("Model succesfully loaded")
-except:
-    print("Could not find saved model data!!")
-    print("Start training model!")
+    
+
+    
+    return LSTM_training_outputs, LSTM_test_outputs
+
+def load_data(data, seq_len, normalise_window):
+
+    
+    sequence_length = seq_len + 1
+    result = []
+    for index in range(len(data) - sequence_length):
+        result.append(data[index: index + sequence_length])
+    
+    if normalise_window:
+        result = normalise_windows(result)
+
+    result = np.array(result)
+
+    row = round(0.9 * result.shape[0])
+    train = result[:int(row), :]
+    np.random.shuffle(train)
+    x_train = train[:, :-1]
+    y_train = train[:, -1]
+    x_test = result[int(row):, :-1]
+    y_test = result[int(row):, -1]
+
+    x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
+    x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))  
+
+    return [x_train, y_train, x_test, y_test]
+
+def normalise_windows(window_data):
+    normalised_data = []
+    for window in window_data:
+        normalised_window = [((float(p) / float(window[0])) - 1) for p in window]
+        normalised_data.append(normalised_window)
+    return normalised_data
+
+    
+def build_model(layers):
     # import the relevant Keras modules
     from keras.models import Sequential
     from keras.layers import Activation, Dense
     from keras.layers import LSTM
     from keras.layers import Dropout
+   
+    model = Sequential()
+
+    model.add(LSTM(
+        input_dim=layers[0],
+        output_dim=layers[1],
+        return_sequences=True))
+    model.add(Dropout(0.2))
+
+    model.add(LSTM(
+        layers[2],
+        return_sequences=False))
+    model.add(Dropout(0.2))
+
+    model.add(Dense(
+        output_dim=layers[3]))
+    model.add(Activation("linear"))
+
+    start = time.time()
+    model.compile(loss="mse", optimizer="rmsprop", metrics=['accuracy'])
+    ###loss="mse", optimizer="rmsprop"
+    ###loss='categorical_crossentropy', optimizer="adam"
+    print ("Compilation Time : ", time.time() - start)
+    return model
+
+
+
+
+if __name__ is "__main__":
+    
+    
+    window_len = 5
+    period = 900
+    ##### get data
+    training_set, test_set, model_data = merge_lstm_data(split_date = '2018-06-20', period = period, features = ['_volatility', '_date','_close',
+                                                              '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet'])
+    
+#    LSTM_training_inputs, LSTM_test_inputs = prep_lstm_input(training_set, test_set, window_len)
+#    
+#    ## accumulate next x values for prediction
+#    LSTM_training_outputs_onehot, LSTM_test_outputs_onehot = prep_lstm_output_reg(training_set, test_set)
+    
+    [x_train, y_train, x_test, y_test] = load_data(np.asarray(model_data['BTC_close']), 50, True)
+    
     from sklearn.metrics import classification_report
+    datPath = 'models/'
+    path = os.path.join(datPath, 'BTC_' + str(period) + '_' + str(window_len) + '.h5')
     
-    def build_model(inputs, output_size, neurons, activ_func="softmax",
-                    dropout=0.25, loss='categorical_crossentropy', optimizer="adam"):
-        model = Sequential()
+    pred_coin = 'BTC_'
+    try:
     
-        model.add(LSTM(output_dim=neurons, activation=activ_func, input_shape=(inputs.shape[1], inputs.shape[2]),return_sequences=False))
+        model = load_model(path)
+        eth_model = model
+    
+        print("Model succesfully loaded")
+    except:
+        print("Could not find saved model data!!")
+        print("Start training model!")
+            # random seed for reproducibility
         
-        model.add(Dropout(dropout))
-        model.add(Dense(units=output_size, activation=activ_func))
-
-    
-        model.compile(loss=loss, optimizer=optimizer,metrics=['accuracy']) #metrics=['accuracy']
-
-        return model
-        # random seed for reproducibility
     np.random.seed(7)
     # initialise model architecture
-    eth_model = build_model(LSTM_training_inputs, output_size=3, neurons = 20)
+    eth_model = build_model(layers = [7,20,50,1])
     # train model on data
     # note: eth_history contains information on the training error per epoch
     eth_history = eth_model.fit(LSTM_training_inputs, LSTM_training_outputs_onehot, 
-                                epochs=20, batch_size=1, verbose=1, shuffle=True,  validation_data=(LSTM_test_inputs, LSTM_test_outputs_onehot))
-
+                                epochs=2, batch_size=1, verbose=1, shuffle=True,  validation_data=(LSTM_test_inputs, LSTM_test_outputs_onehot))
+    
     
     
     y_pred = eth_model.predict(LSTM_test_inputs)
     
+    enc = OneHotEncoder()
+    
+    y_pred_one = enc.fit_transform(y_pred.reshape(-1,1)).toarray()
+    
     target_names = ['class 0', 'class 1', 'class 2']
-    print(classification_report(LSTM_test_outputs, y_pred, target_names=target_names))
+    print(classification_report(LSTM_test_outputs_onehot, y_pred_one, target_names=target_names))
     
     if not os.path.exists(datPath):
         os.mkdir(datPath)
     eth_model.save(path)
-
+    
     print ('model successfully saved!')
 
 
-    fig, ax1 = plt.subplots(1,1)
-    
-    ax1.plot(eth_history.epoch, eth_history.history['loss'])
-    ax1.plot(eth_history.history['val_loss'])
-    ax1.set_title('Training & Test Error')
-    
-    
-    if eth_model.loss == 'mae':
-        ax1.set_ylabel('Mean Absolute Error (MAE)',fontsize=12)
-    # just in case you decided to change the model loss calculation
-    else:
-        ax1.set_ylabel('Model Loss',fontsize=12)
-    ax1.set_xlabel('# Epochs',fontsize=12)
-    plt.legend(['training set', 'validation set'], loc='upper right')
-    plt.savefig(path+'.png')
-    plt.show()
-
-
-from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
-from mpl_toolkits.axes_grid1.inset_locator import mark_inset
-
-fig, ax1 = plt.subplots(1,1)
-ax1.set_xticks([datetime.date(i,j,1) for i in range(2013,2019) for j in [1,5,9]])
-ax1.set_xticklabels([datetime.date(i,j,1).strftime('%b %Y')  for i in range(2013,2019) for j in [1,5,9]])
-ax1.plot(model_data[model_data['date_format']< split_date]['date_format'][window_len:].astype(datetime.datetime),
-         training_set[pred_coin+'close'][window_len:], label='Actual')
-ax1.plot(model_data[model_data['date_format']< split_date]['date_format'][window_len:].astype(datetime.datetime),
-         ((np.transpose(eth_model.predict(LSTM_training_inputs))+1) * training_set[pred_coin+'close'].values[:-window_len])[0], 
-         label='Predicted')
-ax1.set_title('Training Set: Single Timepoint Prediction')
-ax1.set_ylabel('Ethereum Price ($)',fontsize=12)
-ax1.legend(bbox_to_anchor=(0.15, 1), loc=2, borderaxespad=0., prop={'size': 14})
-ax1.annotate('MAE: %.4f'%np.mean(np.abs((np.transpose(eth_model.predict(LSTM_training_inputs))+1)-\
-            (training_set[pred_coin+'close'].values[window_len:])/(training_set[pred_coin+'close'].values[:-window_len]))), 
-             xy=(0.75, 0.9),  xycoords='axes fraction',
-            xytext=(0.75, 0.9), textcoords='axes fraction')
-# figure inset code taken from http://akuederle.com/matplotlib-zoomed-up-inset
-axins = zoomed_inset_axes(ax1, 3.35, loc=10) # zoom-factor: 3.35, location: centre
-axins.set_xticks([datetime.date(i,j,1) for i in range(2013,2019) for j in [1,5,9]])
-axins.plot(model_data[model_data['date_format']< split_date]['date_format'][window_len:].astype(datetime.datetime),
-         training_set[pred_coin+'close'][window_len:], label='Actual')
-axins.plot(model_data[model_data['date_format']< split_date]['date_format'][window_len:].astype(datetime.datetime),
-         ((np.transpose(eth_model.predict(LSTM_training_inputs))+1) * training_set[pred_coin+'close'].values[:-window_len])[0], 
-         label='Predicted')
-axins.set_xlim([datetime.date(2017, 3, 1), datetime.date(2017, 5, 1)])
-axins.set_ylim([10,60])
-axins.set_xticklabels('')
-mark_inset(ax1, axins, loc1=1, loc2=3, fc="none", ec="0.5")
-plt.show()
+#fig, ax1 = plt.subplots(1,1)
+#
+#ax1.plot(eth_history.epoch, eth_history.history['loss'])
+#ax1.plot(eth_history.history['val_loss'])
+#ax1.set_title('Training & Test Error')
+#
+#
+#if eth_model.loss == 'mae':
+#    ax1.set_ylabel('Mean Absolute Error (MAE)',fontsize=12)
+## just in case you decided to change the model loss calculation
+#else:
+#    ax1.set_ylabel('Model Loss',fontsize=12)
+#ax1.set_xlabel('# Epochs',fontsize=12)
+#plt.legend(['training set', 'validation set'], loc='upper right')
+#plt.savefig(path+'.png')
+#plt.show()
+#
+#
+#from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+#from mpl_toolkits.axes_grid1.inset_locator import mark_inset
+#
+#fig, ax1 = plt.subplots(1,1)
+#ax1.set_xticks([datetime.date(i,j,1) for i in range(2013,2019) for j in [1,5,9]])
+#ax1.set_xticklabels([datetime.date(i,j,1).strftime('%b %Y')  for i in range(2013,2019) for j in [1,5,9]])
+#ax1.plot(model_data[model_data['date_format']< split_date]['date_format'][window_len:].astype(datetime.datetime),
+#         training_set[pred_coin+'close'][window_len:], label='Actual')
+#ax1.plot(model_data[model_data['date_format']< split_date]['date_format'][window_len:].astype(datetime.datetime),
+#         ((np.transpose(eth_model.predict(LSTM_training_inputs))+1) * training_set[pred_coin+'close'].values[:-window_len])[0], 
+#         label='Predicted')
+#ax1.set_title('Training Set: Single Timepoint Prediction')
+#ax1.set_ylabel('Ethereum Price ($)',fontsize=12)
+#ax1.legend(bbox_to_anchor=(0.15, 1), loc=2, borderaxespad=0., prop={'size': 14})
+#ax1.annotate('MAE: %.4f'%np.mean(np.abs((np.transpose(eth_model.predict(LSTM_training_inputs))+1)-\
+#            (training_set[pred_coin+'close'].values[window_len:])/(training_set[pred_coin+'close'].values[:-window_len]))), 
+#             xy=(0.75, 0.9),  xycoords='axes fraction',
+#            xytext=(0.75, 0.9), textcoords='axes fraction')
+## figure inset code taken from http://akuederle.com/matplotlib-zoomed-up-inset
+#axins = zoomed_inset_axes(ax1, 3.35, loc=10) # zoom-factor: 3.35, location: centre
+#axins.set_xticks([datetime.date(i,j,1) for i in range(2013,2019) for j in [1,5,9]])
+#axins.plot(model_data[model_data['date_format']< split_date]['date_format'][window_len:].astype(datetime.datetime),
+#         training_set[pred_coin+'close'][window_len:], label='Actual')
+#axins.plot(model_data[model_data['date_format']< split_date]['date_format'][window_len:].astype(datetime.datetime),
+#         ((np.transpose(eth_model.predict(LSTM_training_inputs))+1) * training_set[pred_coin+'close'].values[:-window_len])[0], 
+#         label='Predicted')
+#axins.set_xlim([datetime.date(2017, 3, 1), datetime.date(2017, 5, 1)])
+#axins.set_ylim([10,60])
+#axins.set_xticklabels('')
+#mark_inset(ax1, axins, loc1=1, loc2=3, fc="none", ec="0.5")
+#plt.show()
 
 
