@@ -89,7 +89,7 @@ def create_coin_dataset(coin_list, starttime = '2018-06-05', split_date = '2018-
     return training_set, test_set, model_data     
 
 
-def merge_lstm_data(split_date = '2018-06-24', period = 900, features = ['_volatility', '_date','_close',
+def merge_lstm_data(starttime = '2016-06-24',  split_date = '2018-06-24', period = 900, features = ['_volatility', '_date','_close',
                                                               '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet']):
     ####### important parameters##################
     selected_coins = ['BTC', 'ETH']   #['BTC', 'LTC', 'ETH', 'XMR']
@@ -133,7 +133,7 @@ def merge_lstm_data(split_date = '2018-06-24', period = 900, features = ['_volat
     new_coin_list = {}
     new_coin_list['BTC'] =   merged    
     
-    training_set, test_set, model_data  = create_coin_dataset(new_coin_list, starttime = '2017-06-05',
+    training_set, test_set, model_data  = create_coin_dataset(new_coin_list, starttime = starttime,
                                                   split_date = split_date , 
                                                   features = ['_volatility', '_date','_close',
                                                               '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet'])# '_date','_close_off_high'])    
@@ -406,7 +406,7 @@ if __name__ is "__main__":
     window_len = 5
     period = 900
     ##### get data
-    training_set, test_set, model_data = merge_lstm_data(split_date = '2018-06-20', period = period, features = ['_volatility', '_date','_close',
+    training_set, test_set, model_data = merge_lstm_data(starttime = '2018-06-05', split_date = '2018-06-28', period = period, features = ['_volatility', '_date','_close',
                                                               '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet'])
     
 #    LSTM_training_inputs, LSTM_test_inputs = prep_lstm_input(training_set, test_set, window_len)
