@@ -89,7 +89,7 @@ def create_coin_dataset(coin_list, starttime = '2018-06-05', split_date = '2018-
     return training_set, test_set, model_data     
 
 
-def merge_lstm_data(split_date = '2018-06-20', period = 900, features = ['_volatility', '_date','_close',
+def merge_lstm_data(split_date = '2018-06-24', period = 900, features = ['_volatility', '_date','_close',
                                                               '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet']):
     ####### important parameters##################
     selected_coins = ['BTC', 'ETH']   #['BTC', 'LTC', 'ETH', 'XMR']
@@ -373,8 +373,33 @@ def build_model(layers):
     return model
 
 
+def predict_sequences_multiple(model, data, window_size, prediction_len):
+    #Predict sequence of 50 steps before shifting prediction run forward by 50 steps
+    prediction_seqs = []
+    for i in range(int(len(data)/prediction_len)):
+        curr_frame = data[i*prediction_len]
+        predicted = []
+        for j in range(prediction_len):
+            predicted.append(model.predict(curr_frame[np.newaxis,:,:])[0,0])
+            curr_frame = curr_frame[1:]
+            curr_frame = np.insert(curr_frame, [window_size-1], predicted[-1], axis=0)
+        prediction_seqs.append(predicted)
+    return prediction_seqs
 
 
+def plot_results_multiple(predicted_data, true_data, prediction_len):
+    fig = plt.figure(facecolor='white')
+    ax = fig.add_subplot(111)
+    ax.plot(true_data, label='True Data')
+   
+    #Pad the list of predictions to shift it in the graph to it's correct start
+    for i, data in enumerate(predicted_data):
+        padding = [None for p in range(i * prediction_len)]
+        plt.plot(padding + data, label='Prediction')
+        plt.legend()
+    plt.show()
+    
+    
 if __name__ is "__main__":
     
     
@@ -389,9 +414,11 @@ if __name__ is "__main__":
 #    ## accumulate next x values for prediction
 #    LSTM_training_outputs_onehot, LSTM_test_outputs_onehot = prep_lstm_output_reg(training_set, test_set)
     
-    [x_train, y_train, x_test, y_test] = load_data(np.asarray(model_data['BTC_close']), 50, True)
+    [x_train, y_train, x_test, y_test] = load_data(np.asarray(model_data['BTC_close']), 10, True)
+    [x_train, y_train_off, x_test, y_test_off] = load_data(np.asarray(model_data['BTC_neut_tweet']), 10, False)
     
-    from sklearn.metrics import classification_report
+    
+    
     datPath = 'models/'
     path = os.path.join(datPath, 'BTC_' + str(period) + '_' + str(window_len) + '.h5')
     
@@ -407,48 +434,61 @@ if __name__ is "__main__":
         print("Start training model!")
             # random seed for reproducibility
         
-    np.random.seed(7)
-    # initialise model architecture
-    eth_model = build_model(layers = [7,20,50,1])
-    # train model on data
-    # note: eth_history contains information on the training error per epoch
-    eth_history = eth_model.fit(LSTM_training_inputs, LSTM_training_outputs_onehot, 
-                                epochs=2, batch_size=1, verbose=1, shuffle=True,  validation_data=(LSTM_test_inputs, LSTM_test_outputs_onehot))
+        np.random.seed(7)
+        # initialise model architecture
+        eth_model = build_model(layers = [1,20,50,1])
+        # train model on data
+        # note: eth_history contains information on the training error per epoch
+        eth_history = eth_model.fit(x_train, y_train, 
+                                    epochs=10, batch_size=128, verbose=1, shuffle=True,  validation_data=(x_test, y_test))
+        
+        
+        if not os.path.exists(datPath):
+            os.mkdir(datPath)
+            eth_model.save(path)
+            
+            print ('model successfully saved!')
+
     
     
-    
-    y_pred = eth_model.predict(LSTM_test_inputs)
+    y_pred = eth_model.predict(x_test)
     
     enc = OneHotEncoder()
     
     y_pred_one = enc.fit_transform(y_pred.reshape(-1,1)).toarray()
     
-    target_names = ['class 0', 'class 1', 'class 2']
-    print(classification_report(LSTM_test_outputs_onehot, y_pred_one, target_names=target_names))
+    #target_names = ['class 0', 'class 1', 'class 2']
+    #print(classification_report(y_test, y_pred_one, target_names=target_names))
     
-    if not os.path.exists(datPath):
-        os.mkdir(datPath)
-    eth_model.save(path)
     
-    print ('model successfully saved!')
+    #Predict sequence of 10 steps before shifting prediction run forward by 10 steps
+    prediction_len = 10
+    window_size = 10
+    
+    predictions = predict_sequences_multiple(eth_model, x_test, window_size, prediction_len)
+    plot_results_multiple(predictions, y_test, 10)
+    
+    
+    
 
 
-#fig, ax1 = plt.subplots(1,1)
-#
-#ax1.plot(eth_history.epoch, eth_history.history['loss'])
-#ax1.plot(eth_history.history['val_loss'])
-#ax1.set_title('Training & Test Error')
-#
-#
-#if eth_model.loss == 'mae':
-#    ax1.set_ylabel('Mean Absolute Error (MAE)',fontsize=12)
-## just in case you decided to change the model loss calculation
-#else:
-#    ax1.set_ylabel('Model Loss',fontsize=12)
-#ax1.set_xlabel('# Epochs',fontsize=12)
-#plt.legend(['training set', 'validation set'], loc='upper right')
-#plt.savefig(path+'.png')
-#plt.show()
+
+    fig, ax1 = plt.subplots(1,1)
+    
+    ax1.plot(eth_history.epoch, eth_history.history['loss'])
+    ax1.plot(eth_history.history['val_loss'])
+    ax1.set_title('Training & Test Error')
+    
+    
+    if eth_model.loss == 'mae':
+        ax1.set_ylabel('Mean Absolute Error (MAE)',fontsize=12)
+    # just in case you decided to change the model loss calculation
+    else:
+        ax1.set_ylabel('Model Loss',fontsize=12)
+    ax1.set_xlabel('# Epochs',fontsize=12)
+    plt.legend(['training set', 'validation set'], loc='upper right')
+    plt.savefig(path+'.png')
+    plt.show()
 #
 #
 #from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
