@@ -15,7 +15,7 @@ import time
 
 class get_poloniex_data:
     
-    def __init__(self, startdate = 20130428, enddate=time.strftime("%Y%m%d")):
+    def __init__(self, startdate = 20150528, enddate=time.strftime("%Y%m%d")):
        
       
         self.startdate = startdate
@@ -36,8 +36,10 @@ class get_poloniex_data:
             dfp = os.path.join(self.datPath, coin + str(self.period) + '.csv')
             try:
                 df = pd.read_csv(dfp, sep = ',')
+                df = df[df['date_format']>=self.startdate]
             except FileNotFoundError:
                 df = self.GetCurDF(coin, dfp)
+                df = df[df['date_format']>=self.startdate]
             D[coin] = df
             print ("Successfully loaded data: ", coin)
 
@@ -45,7 +47,8 @@ class get_poloniex_data:
 #        cr = min(Di.shape[0] for Di in D)
 #        for i in range(len(coins)):
 #            D[i] = D[i][(D[i].shape[0] - cr):]
-                
+        
+        
         return D    
             
  
