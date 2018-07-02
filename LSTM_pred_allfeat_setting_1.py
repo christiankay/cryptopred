@@ -21,7 +21,7 @@ import re
 from sklearn.preprocessing import OneHotEncoder
 
 
-def create_coin_dataset(coin_list, starttime = '2018-06-05', split_date = '2018-06-05' , features = ['_close','_volume','_close_off_high','_volatility', '_date']):
+def create_coin_dataset(coin_list, starttime = '2018-06-05', split_date = '2018-06-05' , enddate ='2018-06-05', features = ['_close','_volume','_close_off_high','_volatility', '_date']):
     
     print("Creating coin data set..")
     market_info_prev = False
@@ -62,6 +62,8 @@ def create_coin_dataset(coin_list, starttime = '2018-06-05', split_date = '2018-
     
     # need to reverse the data frame so that subsequent rows represent later timepoints
     market_info = market_info[market_info['date_format']>=starttime]
+    market_info = market_info[market_info['date_format']<=enddate]
+ 
     model_data = market_info[['date_format']+[coin+metric for coin in coin_list
                                    for metric in features]]
     for coin in coin_list:
@@ -90,10 +92,10 @@ def create_coin_dataset(coin_list, starttime = '2018-06-05', split_date = '2018-
     return training_set, test_set, model_data     
 
 
-def merge_lstm_data(starttime = '2016-06-24',  split_date = '2018-06-20', period = 900, features = ['_volatility', '_date','_close',
+def merge_lstm_data(starttime = '2016-06-24',  split_date = '2018-06-20', enddate= '2018-06-27', period = 900, features = ['_volatility', '_date','_close',
                                                               '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet']):
     
-    filestr =  'start_'  + str(starttime) + '_split_' + str(split_date) + '_period_' + str(period)    
+    filestr =  'start_'  + str(starttime) + '_split_' + str(split_date) + '_end_' + str(enddate) + '_period_' + str(period)    
     try:
         
         training_set = pd.read_csv('CurDat/temp_results_train_'+filestr+'.csv')
@@ -126,13 +128,24 @@ def merge_lstm_data(starttime = '2016-06-24',  split_date = '2018-06-20', period
         #get_tweet_data.fetch_stocktwits(query='BITCOIN')
         ### delete duplicates data from CSV
         tweet_data = get_tweet_data.read_and_clean_data_from_csv(query='BITCOIN')
+        
+        data_new  = tweet_data.dropna(subset=['Tweets', 'Date'])
+        print("Dropped NaN tweets: " , len(tweet_data)-len(data_new))
+        tweet_data = data_new
+        tweet_data['Date'] = pd.to_datetime(tweet_data['Date'], format="%Y-%m-%d %H:%M:%S")
+        tweet_data = tweet_data[tweet_data['Date']>=starttime]
+        print('Start date for tweet analizing: ', starttime)
+       # print('End date for tweet analizing: ', enddate)
+       # tweet_data = tweet_data[tweet_data['Date']<=enddate]
         #data = get_tweet_data.data
                 
-        fin_data = coin_list['BTC']
         
+        print('Lenght of tweet data set: ',len(tweet_data))
         ### analyze sentiment
         tweet_results = get_tweet_data.analyze_Tweets(tweet_data)
         
+        
+        fin_data = coin_list['BTC']
         fin_data['Date'] = pd.to_datetime(fin_data.date_format)
         tweet_results['Date'] = pd.to_datetime(tweet_results['days'])
         
@@ -144,7 +157,7 @@ def merge_lstm_data(starttime = '2016-06-24',  split_date = '2018-06-20', period
         new_coin_list['BTC'] =   merged    
         
         training_set, test_set, model_data  = create_coin_dataset(new_coin_list, starttime = starttime,
-                                                      split_date = split_date , 
+                                                      split_date = split_date , enddate = enddate,
                                                       features = ['_volatility', '_date','_close',
                                                                   '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet'])# '_date','_close_off_high'])    
         #
@@ -435,7 +448,7 @@ if __name__ is "__main__":
     
 
 
-    training_set, test_set, model_data = merge_lstm_data(starttime = '2018-06-14', split_date = '2018-06-25', period = period, features = ['_volatility', '_date','_close',
+    training_set, test_set, model_data = merge_lstm_data(starttime = '2018-06-14', split_date = '2018-06-25', enddate= '2018-06-26', period = period, features = ['_volatility', '_date','_close',
                                                               '_len_day_data' , '_neg_res', '_neut_tweet', '_pos_tweet'])
     
         
